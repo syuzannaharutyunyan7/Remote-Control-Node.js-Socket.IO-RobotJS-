@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Remote Control</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="login">
+  <h2>Enter Password</h2>
+  <input type="password" id="password">
+  <button onclick="authenticate()">Connect</button>
+</div>
+
+<div id="control" style="display:none;">
+  <h2>Remote Control</h2>
+
+  <input type="text" id="textInput" placeholder="Type text">
+  <button onclick="sendText()">Send</button>
+
+  <div>
+    <button onclick="sendKey('enter')">Enter</button>
+    <button onclick="sendKey('backspace')">Backspace</button>
+    <button onclick="sendKey('space')">Space</button>
+  </div>
+
+  <h3>Touchpad Area</h3>
+  <div id="touchpad"></div>
+
+  <div>
+    <button onclick="clickMouse('left')">Left Click</button>
+    <button onclick="clickMouse('right')">Right Click</button>
+  </div>
+</div>
+
+<script>
+const socket = io();
+
+function authenticate() {
+  socket.emit("authenticate", document.getElementById("password").value);
+}
+
+socket.on("auth_success", () => {
+  document.getElementById("login").style.display = "none";
+  document.getElementById("control").style.display = "block";
+});
+
+socket.on("auth_failed", () => alert("Wrong password"));
+
+function sendText() {
+  socket.emit("type", document.getElementById("textInput").value);
+}
+
+function sendKey(key) {
+  socket.emit("key", key);
+}
+
+function clickMouse(btn) {
+  socket.emit("click", btn);
+}
+
+const touchpad = document.getElementById("touchpad");
+let lastX = 0, lastY = 0, dragging = false;
+
+// Prevent default touch scrolling
+touchpad.style.touchAction = "none";
+
+// Pointer down (mouse or pointer devices)
+touchpad.addEventListener("pointerdown", (e) => {
+  dragging = true;
+  lastX = e.clientX;
+  lastY = e.clientY;
+  touchpad.setPointerCapture(e.pointerId);
+});
+
+// Pointer move
+touchpad.addEventListener("pointermove", (e) => {
+  if (!dragging) return;
+  const dx = e.clientX - lastX;
+  const dy = e.clientY - lastY;
+  socket.emit("mouse_move", { x: dx, y: dy });
+  lastX = e.clientX;
+  lastY = e.clientY;
+});
+
+// When pointer lifts
+touchpad.addEventListener("pointerup", () => {
+  dragging = false;
+});
+
+// Touch events for phones
+touchpad.addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  dragging = true;
+  lastX = e.touches[0].clientX;
+  lastY = e.touches[0].clientY;
+}, { passive: false });
+
+touchpad.addEventListener("touchmove", (e) => {
+  e.preventDefault();
+  if (!dragging) return;
+  const t = e.touches[0];
+  const dx = t.clientX - lastX;
+  const dy = t.clientY - lastY;
+  socket.emit("mouse_move", { x: dx, y: dy });
+  lastX = t.clientX;
+  lastY = t.clientY;
+}, { passive: false });
+
+touchpad.addEventListener("touchend", () => {
+  dragging = false;
+});
+</script>
+
+</body>
+</html>
